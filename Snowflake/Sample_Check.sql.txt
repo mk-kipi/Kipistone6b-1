@@ -1,1 +1,38 @@
+# RBAC
 
+--SP_CREATE_ROLE
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_CREATE_ROLE("EXEC_ROLE" VARCHAR(16777216), "ROLE_NAME" VARCHAR(16777216), "COMMENTS" VARCHAR(16777216), "ENV" VARCHAR(16777216))
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+STRICT
+COMMENT='Stored Procedure to create ROLE.'
+EXECUTE AS CALLER
+AS '
+   var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+   var inp_role_name = ROLE_NAME.toLocaleUpperCase();
+    var inp_comments=COMMENTS.toLocaleUpperCase();
+    var inp_env=ENV.toLocaleLowerCase();
+   try
+   {
+       snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+       try
+       {
+           snowflake.execute({sqlText: `CREATE ROLE ${inp_role_name} COMMENT=''${inp_comments}'' with tag(environment=''${inp_env}'')`});
+           var table_as_json = {};
+           table_as_json = { "flag" : 1,"response": ''Role '' + inp_role_name + '' created successfully!''};
+           return table_as_json;
+       }
+       catch(e)
+       {
+       var table_as_json = {};
+       table_as_json = { "flag" : 0,"response": e.message};
+       return table_as_json;
+       }
+   }
+   catch(err)
+   {
+       var table_as_json = {};
+       table_as_json = { "flag" : 0,"response": err.message};
+       return table_as_json;
+   }
+';
