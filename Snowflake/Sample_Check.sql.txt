@@ -1,6 +1,7 @@
 # RBAC
 
---SP_CREATE_ROLE
+--SP_CREATE_ROLE--
+
 CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_CREATE_ROLE("EXEC_ROLE" VARCHAR(16777216), "ROLE_NAME" VARCHAR(16777216), "COMMENTS" VARCHAR(16777216), "ENV" VARCHAR(16777216))
 RETURNS VARIANT
 LANGUAGE JAVASCRIPT
@@ -35,4 +36,1311 @@ AS '
        table_as_json = { "flag" : 0,"response": err.message};
        return table_as_json;
    }
+';
+
+
+
+---SP_CREATE_USER---
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_CREATE_USER("EXEC_ROLE" VARCHAR(16777216), "DISPLAY_NAME" VARCHAR(16777216), "LOGIN_NAME" VARCHAR(16777216))
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+COMMENT='Stored Procedure to CREATE USER to build the RBAC hierarchy.'
+EXECUTE AS CALLER
+AS '
+var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+var display_name = DISPLAY_NAME.toLocaleUpperCase();
+var login_name= LOGIN_NAME.toLocaleUpperCase();
+
+try
+    {
+        snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+        try
+        {
+            snowflake.execute({sqlText: `CREATE USER ${display_name} LOGIN_NAME = ${login_name} DISPLAY_NAME = ${display_name}`});
+            var table_as_json = {};
+            table_as_json = { "flag" : 1,"response": ''User '' + display_name + '' created successfully!''};
+            return table_as_json;
+        }
+        catch(e)
+        {
+            var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": e.message};
+        return table_as_json;
+        }
+    }
+    catch(err)
+    {   
+    var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+----SP_CREATE_WAREHOUE---
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_CREATE_WAREHOUSE("EXEC_ROLE" VARCHAR(16777216), "WAREHOUSE_NAME" VARCHAR(16777216), "WAREHOUSE_SIZE" VARCHAR(16777216), "MAX_CLUSTER_COUNT" FLOAT, "MIN_CLUSTER_COUNT" FLOAT, "SCALING_POLICY" VARCHAR(16777216), "AUTO_SUSPEND" FLOAT, "AUTO_RESUME" VARCHAR(16777216), "INITIALLY_SUSPENDED" VARCHAR(16777216))
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+COMMENT='Generic Script to Create warehouse'
+EXECUTE AS CALLER
+AS '
+var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+var wh_name= WAREHOUSE_NAME.toLocaleUpperCase();
+var wh_size= WAREHOUSE_SIZE.toLocaleUpperCase();
+var max_cluster= MAX_CLUSTER_COUNT;
+var min_cluster=MIN_CLUSTER_COUNT;
+var scaling_policy=SCALING_POLICY.toLocaleUpperCase();
+var auto_suspend=AUTO_SUSPEND;
+var auto_resume=AUTO_RESUME.toLocaleUpperCase();
+var initailly_suspend=INITIALLY_SUSPENDED.toLocaleUpperCase();
+
+try
+    {
+        snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+        try
+        {
+            if(auto_suspend==0)
+            {
+            auto_suspend=null;
+            }
+            snowflake.execute({sqlText: `CREATE WAREHOUSE ${wh_name} WAREHOUSE_SIZE = ${wh_size} AUTO_SUSPEND = ${auto_suspend} AUTO_RESUME = ${auto_resume} MIN_CLUSTER_COUNT = ${min_cluster} MAX_CLUSTER_COUNT = ${max_cluster} SCALING_POLICY = ${scaling_policy}`});
+            var table_as_json = {};
+            table_as_json = { "flag" : 1,"response": ''WAREHOUSE '' + wh_name + '' created successfully!''};
+            return table_as_json;
+        }
+        catch(e)
+        {
+            var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": e.message};
+        return table_as_json;
+        }
+    }
+    catch(err)
+    {
+        var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+
+---SP_DROP_ROLE------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_DROP_ROLE("EXEC_ROLE" VARCHAR(16777216), "ROLE_NAME" VARCHAR(16777216), "IS_CONFIRMED" FLOAT)
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+COMMENT='Stored Procedure to drop the ROLE from snowflake instance.'
+EXECUTE AS CALLER
+AS '
+var count=0;
+var is_confirmed=IS_CONFIRMED;
+var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+var role_name = ROLE_NAME.toLocaleUpperCase();
+    try
+   {
+       snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+   try
+       {
+           if(is_confirmed==0)
+           {
+           snowflake.execute({sqlText: `USE ROLE SYSADMIN`});
+           snowflake.execute({sqlText: `SHOW GRANTS TO ROLE IDENTIFIER(''${role_name}'')`});
+     	   var rs = snowflake.execute({sqlText: `SELECT "name" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "granted_to" = ''ROLE'' AND "granted_on" = ''ROLE'' AND "privilege"=''USAGE'';`});
+           while(rs.next())
+           {
+           count=count+1;
+           }
+           if(count==0)
+           {
+           snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+           snowflake.execute({sqlText: `DROP ROLE ${role_name}`});
+           var table_as_json = {};
+           table_as_json = { "flag" : 1,"response": ''Role '' + role_name + '' dropped successfully!''};
+           return table_as_json;
+           }
+           else{
+               var table_as_json = {};
+           table_as_json = { "flag" : 1,"response": ''WARNING: Role '' + role_name + '' has dependencies, please revoke the dependencies before dropping the role!''};
+           return table_as_json;
+           }
+           }
+           else
+           {
+            snowflake.execute({sqlText: `DROP ROLE ${role_name}`});
+           var table_as_json = {};
+           table_as_json = { "flag" : 1,"response": ''Role '' + role_name + '' dropped successfully!''};
+           return table_as_json;
+           }
+       }
+   catch(e)
+       {
+          var table_as_json = {};
+       table_as_json = { "flag" : 0,"response": e.message};
+       return table_as_json;
+       }
+    }
+    catch(err)
+   {
+      var table_as_json = {};
+       table_as_json = { "flag" : 0,"response": err.message};
+       return table_as_json;
+   }
+';
+
+
+---SP_DROP_USER------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_DROP_USER("EXEC_ROLE" VARCHAR(16777216), "DISPLAY_NAME" ARRAY)
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+COMMENT='Stored Procedure to drop the USER from snowflake instance.'
+EXECUTE AS CALLER
+AS '
+
+var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+
+
+try
+    {
+        snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+        try
+        {
+            for (var col_num = 0; col_num < DISPLAY_NAME.length; col_num = col_num + 1)
+            {
+             var display_name = DISPLAY_NAME[col_num].toLocaleUpperCase();
+            snowflake.execute({sqlText: `DROP USER ${display_name}`});
+            }
+            var table_as_json = {};
+            table_as_json = { "flag" : 1,"response":''User '' + DISPLAY_NAME + '' dropped successfully!''};
+            return table_as_json;
+        }
+        catch(e)
+        {
+            var table_as_json = {};
+            table_as_json = { "flag" : 0,"response": e.message};
+            return table_as_json;
+        }
+	}
+    catch(err)
+    {
+        var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+
+----SP_DROP_WAREHOUSE-----
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_DROP_WAREHOUSE("EXEC_ROLE" VARCHAR(16777216), "WAREHOUSE_NAME" ARRAY)
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+COMMENT='Stored Procedure to drop the WAREHOUSE from snowflake instance.'
+EXECUTE AS CALLER
+AS '
+var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+
+
+try
+    {
+        snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});     
+    try
+        {   
+            for (var col_num = 0; col_num < WAREHOUSE_NAME.length; col_num = col_num + 1)
+			{
+            var wh_name = WAREHOUSE_NAME[col_num].toLocaleUpperCase();
+            snowflake.execute({sqlText: `DROP WAREHOUSE ${wh_name}`});
+            }
+            var table_as_json = {};
+            table_as_json = { "flag" : 1,"response": ''Warehouse '' + WAREHOUSE_NAME + '' dropped successfully!''};
+            return table_as_json;
+        }
+    catch(e)
+        {
+            
+        var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": e.message};
+        return table_as_json;
+
+        }
+    }
+catch(err)
+    {
+        
+        var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+
+    }
+   
+';
+
+
+
+-------SP_GRANT_PRIVS_TO_ROLE------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_GRANT_PRIVS_TO_ROLE("EXEC_ROLE" VARCHAR(16777216), "PRIVILEGES_LIST" VARCHAR(16777216), "ON_OBJECT_LEVEL" VARCHAR(16777216), "ON_OBJECT_NAME" ARRAY, "IN_OBJECT_LEVEL" VARCHAR(16777216), "IN_OBJECT_NAME" VARCHAR(16777216), "TARGET_ROLE_NAME" ARRAY)
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+COMMENT='Stored Procedure to grant ROLE to a ROLE or a USER to build the RBAC hierarchy.'
+EXECUTE AS CALLER
+AS '
+    var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+    var inp_privileges = PRIVILEGES_LIST.toLocaleUpperCase();
+ 
+    if (!ON_OBJECT_LEVEL) { var inp_on_object_level = '''' }
+        else {var inp_on_object_level = ON_OBJECT_LEVEL.toLocaleUpperCase();}
+ 
+    if (!IN_OBJECT_LEVEL) { var inp_in_object_level = '''' }
+        else {var inp_in_object_level = IN_OBJECT_LEVEL.toLocaleUpperCase();}
+ 
+    if (!IN_OBJECT_NAME) { var inp_in_object_name = '''' }
+        else {var inp_in_object_name = IN_OBJECT_NAME.toLocaleUpperCase();}
+  
+    try
+    {
+        snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+        try
+        {
+            for (var col_num1 = 0; col_num1 < TARGET_ROLE_NAME.length; col_num1 = col_num1 + 1)
+			{
+            var inp_target_role_name = TARGET_ROLE_NAME[col_num1].toLocaleUpperCase();
+            if (!inp_in_object_level || !inp_in_object_name)
+            {   
+                
+                for (var col_num = 0; col_num < ON_OBJECT_NAME.length; col_num = col_num + 1)
+				{
+					if (!ON_OBJECT_NAME[col_num]) {var inp_on_object_name = '''' }
+					else {var inp_on_object_name = ON_OBJECT_NAME[col_num].toLocaleUpperCase();}
+					var resp=snowflake.execute({sqlText: `GRANT ${inp_privileges} ON ${inp_on_object_level} ${inp_on_object_name} TO ROLE ${inp_target_role_name}`});
+					while(resp.next())
+					{
+					if(resp.getColumnValue(1)=="Grant not executed: Insufficient privileges.")
+					{
+						throw new Error("Role doesn''t have enough privileges to grant privileges");
+					}
+					else
+					{
+					continue;
+					}
+					}
+					continue;
+				}
+                
+            }
+				
+            
+            else
+            {	
+				for (var col_num = 0; col_num < ON_OBJECT_NAME.length; col_num = col_num + 1)
+				{
+					if (!ON_OBJECT_NAME[col_num]) {var inp_on_object_name = '''' }
+					else {var inp_on_object_name = ON_OBJECT_NAME[col_num].toLocaleUpperCase();}
+					var resp=snowflake.execute({sqlText: `GRANT ${inp_privileges} ON ${inp_on_object_level} ${inp_on_object_name} IN ${inp_in_object_level} ${inp_in_object_name} TO ROLE ${inp_target_role_name}`});
+         
+					while (resp.next())
+					{
+					if(resp.getColumnValue(1)=="Grant not executed: Insufficient privileges.")
+					{
+					throw new Error("Role doesn''t have enough privileges to grant privileges");
+					}
+					else
+					{
+					continue;
+					}
+					}
+					continue;
+				}
+				
+            }
+            }
+            var table_as_json = {};
+                table_as_json = { "flag" : 1,"response": ''Privileges are granted to the ROLE '' + TARGET_ROLE_NAME + '' successfully!''};
+                return table_as_json;
+        }
+        catch(e)
+        {
+            var table_as_json = {};
+            table_as_json = { "flag" : 0,"response": e.message};
+            return table_as_json;
+        }
+    }
+    catch(err)
+    {
+       var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+
+
+
+----SP_GRANT_PRIVS_TO_ROLE_TEST-----
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_GRANT_PRIVS_TO_ROLE_TEST("EXEC_ROLE" VARCHAR(16777216), "PRIVILEGES_LIST" VARCHAR(16777216), "ON_OBJECT_LEVEL" VARCHAR(16777216), "ON_OBJECT_NAME" ARRAY, "IN_OBJECT_LEVEL" VARCHAR(16777216), "IN_OBJECT_NAME" VARCHAR(16777216), "TARGET_ROLE_NAME" ARRAY)
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+COMMENT='Stored Procedure to grant ROLE to a ROLE or a USER to build the RBAC hierarchy.'
+EXECUTE AS CALLER
+AS '
+    var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+    var inp_privileges = PRIVILEGES_LIST.toLocaleUpperCase();
+ 
+    if (!ON_OBJECT_LEVEL) { var inp_on_object_level = '''' }
+        else {var inp_on_object_level = ON_OBJECT_LEVEL.toLocaleUpperCase();}
+ 
+    if (!IN_OBJECT_LEVEL) { var inp_in_object_level = '''' }
+        else {var inp_in_object_level = IN_OBJECT_LEVEL.toLocaleUpperCase();}
+ 
+    if (!IN_OBJECT_NAME) { var inp_in_object_name = '''' }
+        else {var inp_in_object_name = IN_OBJECT_NAME.toLocaleUpperCase();}
+  
+    try
+    {
+        snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+        try
+        {
+            for (var col_num1 = 0; col_num1 < TARGET_ROLE_NAME.length; col_num1 = col_num1 + 1)
+			{
+            var inp_target_role_name = TARGET_ROLE_NAME[col_num1].toLocaleUpperCase();
+            if (!inp_in_object_level || !inp_in_object_name)
+            {   
+                
+                for (var col_num = 0; col_num < ON_OBJECT_NAME.length; col_num = col_num + 1)
+				{
+					if (!ON_OBJECT_NAME[col_num]) {var inp_on_object_name = '''' }
+					else {var inp_on_object_name = ON_OBJECT_NAME[col_num].toLocaleUpperCase();}
+					var resp=snowflake.execute({sqlText: `GRANT ${inp_privileges} ON ${inp_on_object_level} ${inp_on_object_name} TO ROLE ${inp_target_role_name}`});
+					while(resp.next())
+					{
+					if(resp.getColumnValue(1)=="Grant not executed: Insufficient privileges.")
+					{
+						throw new Error("Role doesn''t have enough privileges to grant privileges");
+					}
+					else
+					{
+					continue;
+					}
+					}
+					continue;
+				}
+                
+            }
+				
+            
+            else
+            {	
+				for (var col_num = 0; col_num < ON_OBJECT_NAME.length; col_num = col_num + 1)
+				{
+					if (!ON_OBJECT_NAME[col_num]) {var inp_on_object_name = '''' }
+					else {var inp_on_object_name = ON_OBJECT_NAME[col_num].toLocaleUpperCase();}
+					var resp=snowflake.execute({sqlText: `GRANT ${inp_privileges} ON ${inp_on_object_level} ${inp_on_object_name} IN ${inp_in_object_level} ${inp_in_object_name} TO ROLE ${inp_target_role_name}`});
+         
+					while (resp.next())
+					{
+					if(resp.getColumnValue(1)=="Grant not executed: Insufficient privileges.")
+					{
+					throw new Error("Role doesn''t have enough privileges to grant privileges");
+					}
+					else
+					{
+					continue;
+					}
+					}
+					continue;
+				}
+				
+            }
+            }
+            var table_as_json = {};
+                table_as_json = { "flag" : 1,"response": ''Privileges are granted to the ROLE '' + TARGET_ROLE_NAME + '' successfully!''};
+                return table_as_json;
+        }
+        catch(e)
+        {
+            var table_as_json = {};
+            table_as_json = { "flag" : 0,"response": e.message};
+            return table_as_json;
+        }
+    }
+    catch(err)
+    {
+       var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+
+-----SP_GRANT_ROLE_TO_ROLE-----
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_GRANT_ROLE_TO_ROLE("EXEC_ROLE" VARCHAR(16777216), "ROLE_NAME" VARCHAR(16777216), "TARGET_NAME" VARCHAR(16777216))
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+STRICT
+COMMENT='Stored Procedure to grant ROLE to a ROLE or a USER to build the RBAC hierarchy.'
+EXECUTE AS CALLER
+AS '
+    var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+    var inp_role_name = ROLE_NAME.toLocaleUpperCase();
+    var inp_target_name = TARGET_NAME.toLocaleUpperCase();
+    try
+    {     
+            snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+            try
+            {
+                var resp=snowflake.execute({sqlText: `GRANT ROLE ${inp_role_name} TO ROLE ${inp_target_name}`});
+                while (resp.next())
+                {
+                if(resp.getColumnValue(1)=="Grant not executed: Insufficient privileges.")
+                {
+                  throw new Error("Role doesn''t have enough privileges to grant role");
+                }
+                else
+                {
+                var table_as_json = {};
+                table_as_json = { "flag" : 1,"response": ''ROLE '' + inp_role_name + '' is assigned to Role '' + '' '' + inp_target_name +'' successfully!''};
+                return table_as_json;
+                }
+                }
+                
+            }
+            catch(e)
+            {
+                var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": e.message};
+        return table_as_json;
+            }
+            
+        }
+       
+    catch(err)
+    {
+    var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+    
+';
+
+-------------SP_GRANT_ROLE_TO_USER-----------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_GRANT_ROLE_TO_USER("EXEC_ROLE" VARCHAR(16777216), "ROLE_NAME" ARRAY, "TARGET_NAME" ARRAY)
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+STRICT
+COMMENT='Stored Procedure to grant ROLE to a ROLE or a USER to build the RBAC hierarchy.'
+EXECUTE AS CALLER
+AS '
+    var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+    try
+    {        
+            snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+            try
+            {
+                for (var col_num = 0; col_num < ROLE_NAME.length; col_num = col_num + 1)
+                {
+                var inp_role_name = ROLE_NAME[col_num].toLocaleUpperCase();
+                for (var col_num1 = 0; col_num1 < TARGET_NAME.length; col_num1 = col_num1 + 1)
+                {
+                var inp_target_name = TARGET_NAME[col_num1].toLocaleUpperCase();
+                var resp=snowflake.execute({sqlText: `GRANT ROLE ${inp_role_name} TO USER ${inp_target_name}`});
+                while (resp.next())
+                {
+                if(resp.getColumnValue(1)=="Grant not executed: Insufficient privileges.")
+                {
+                  throw new Error("Role doesn''t have enough privileges to grant role");
+                }
+                }
+                }
+                }
+                var table_as_json = {};
+                table_as_json = { "flag" : 1,"response": ''ROLE '' + ROLE_NAME + '' is assigned to User ''+ '' '' + TARGET_NAME +'' successfully!''};
+                return table_as_json;
+            }
+            catch(e)
+            {
+                var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": e.message};
+        return table_as_json;
+            }
+            
+        }
+        
+    catch(err)
+    {
+    var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+    
+';
+
+
+--------SP_INDEPENDENT_ROLES-----------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_INDEPENDENT_ROLES()
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+var array_of_rows = [];
+snowflake.execute({ sqlText: `CREATE OR REPLACE TEMPORARY TABLE  TBL (CHILD_ROLE VARCHAR,PARENT_ROLE VARCHAR,ENVIRONMENT VARCHAR);` });
+try {
+    snowflake.execute({ sqlText: `show roles;` });
+    var rs = snowflake.execute({ sqlText: `SELECT "name", "granted_to_roles" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) ORDER BY "created_on" ASC;` });
+    var insert_records_array = [];
+    var disconnected_roles_array = [];
+    while (rs.next()) {
+        var role_name = rs.getColumnValue(1);
+
+        var temp_tag=snowflake.execute({sqlText: `SELECT tag_value FROM TABLE(information_schema.tag_references(''${role_name}'', ''ROLE'')) where tag_name=''ENVIRONMENT'';`});
+        var env='''';
+
+        if(temp_tag.next()){
+            env= temp_tag.getColumnValue(1);
+        }
+
+        if (rs.getColumnValue(2) > 0) {
+            snowflake.execute({ sqlText: `SHOW GRANTS OF ROLE IDENTIFIER(''${role_name}'')` });
+            var rs1 = snowflake.execute({ sqlText: `SELECT "grantee_name" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "granted_to"= ''ROLE'' ORDER BY "created_on" ASC;` });
+            while (rs1.next()) {
+                var parent_role_name=rs1.getColumnValue(1);
+                
+                insert_records_array.push(`(''${ role_name}'',''${parent_role_name}'',''${env}'')`);
+            }
+        }
+        else {
+            insert_records_array.push(`(''${role_name}'',''NULL'',''${env}'')`);
+
+            if (role_name != ''ACCOUNTADMIN'') {
+                disconnected_roles_array.push(role_name);
+            }
+
+        }
+    }
+    if (insert_records_array.length != 0) {
+        snowflake.execute({ sqlText: `INSERT INTO TBL VALUES` + insert_records_array.join() + `;` });
+    }
+
+
+
+    for (var col_num = 0; col_num < disconnected_roles_array.length; col_num = col_num + 1)
+    {
+        var in_role_name0=disconnected_roles_array[col_num];
+        var rs2=snowflake.execute({sqlText: `SELECT
+                        distinct
+						LEVEL-1 as level,
+                        CHILD_ROLE,
+                        PARENT_ROLE,
+                        ENVIRONMENT
+						FROM TBL
+						START WITH CHILD_ROLE = ''${in_role_name0}''
+						CONNECT BY PARENT_ROLE = PRIOR CHILD_ROLE
+						ORDER BY LEVEL`});
+        
+        var row_num = 1;
+		while (rs2.next())
+		{	
+            var row_as_json = {};			
+		
+            row_as_json[''level''] = rs2.getColumnValue(1);
+            row_as_json[''childRole''] = rs2.getColumnValue(2);
+            row_as_json[''parentRole''] = rs2.getColumnValue(3);
+            row_as_json[''environment''] = rs2.getColumnValue(4);
+			array_of_rows.push(row_as_json);
+			++row_num;
+        }
+    }
+
+    var table_as_json = {};
+    table_as_json = { "flag": 1, "response": array_of_rows };
+    return table_as_json;
+ 
+}
+catch (err) {
+    var table_as_json = {};
+    table_as_json = { "flag": 0, "response": err.message };
+    return table_as_json;
+}
+';
+
+
+------SP_RBAC_HIERARCHY()-----------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RBAC_HIERARCHY()
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+var array_of_rows = [];
+snowflake.execute({ sqlText: `CREATE OR REPLACE TEMPORARY TABLE  TBL (CHILD_ROLE VARCHAR,PARENT_ROLE VARCHAR,ENVIRONMENT VARCHAR);` });
+
+try {
+    snowflake.execute({ sqlText: `show roles;` });
+    var rs = snowflake.execute({ sqlText: `SELECT "name", "granted_to_roles" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) ORDER BY "created_on" ASC;` });
+    var insert_records_array = [];
+    while (rs.next()) {
+        var role_name = rs.getColumnValue(1);
+
+        var temp_tag=snowflake.execute({sqlText: `SELECT tag_value FROM TABLE(information_schema.tag_references(''${role_name}'', ''ROLE'')) where tag_name=''ENVIRONMENT'';`});
+        var env='''';
+
+        if(temp_tag.next()){
+            env= temp_tag.getColumnValue(1);
+        }
+
+        if (rs.getColumnValue(2) > 0) {
+            snowflake.execute({ sqlText: `SHOW GRANTS OF ROLE IDENTIFIER(''${role_name}'')` });
+            var rs1 = snowflake.execute({ sqlText: `SELECT "grantee_name" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "granted_to"= ''ROLE'' ORDER BY "created_on" ASC;` });
+            while (rs1.next()) {
+                var parent_role_name=rs1.getColumnValue(1);
+                
+                insert_records_array.push(`(''${ role_name}'',''${parent_role_name}'',''${env}'')`);
+            }
+        }
+        else {
+            insert_records_array.push(`(''${role_name}'',''NULL'',''${env}'')`);
+        }
+    }
+    if (insert_records_array.length != 0) {
+        snowflake.execute({ sqlText: `INSERT INTO TBL VALUES` + insert_records_array.join() + `;` });
+    }
+ 
+    var rs1 = snowflake.execute({
+        sqlText: `
+                    SELECT distinct
+                    LEVEL-1 as level,
+                    CHILD_ROLE,
+                    PARENT_ROLE,
+                    ENVIRONMENT
+                    FROM TBL
+                    START WITH CHILD_ROLE = ''ACCOUNTADMIN''
+                    CONNECT BY PARENT_ROLE = PRIOR CHILD_ROLE
+                    ORDER BY LEVEL`});
+ 
+    var row_num = 1;
+    while (rs1.next()) {
+        var row_as_json = {};
+        row_as_json[''LEVEL''] = rs1.getColumnValue(1);
+        row_as_json[''CHILD_ROLE''] = rs1.getColumnValue(2);
+        row_as_json[''PARENT_ROLE''] = rs1.getColumnValue(3);
+        row_as_json[''ENVIRONMENT''] = rs1.getColumnValue(4);            
+ 
+        array_of_rows.push(row_as_json);
+        ++row_num;
+    }
+    var table_as_json = {};
+    table_as_json = { "flag": 1, "response": array_of_rows };
+    return table_as_json;
+ 
+}
+catch (err) {
+    var table_as_json = {};
+    table_as_json = { "flag": 0, "response": err.message };
+    return table_as_json;
+}
+';
+
+
+
+------------SP_REPLICATE_PRIV_TO_USER------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_REPLICATE_PRIV_TO_USER("EXEC_ROLE" VARCHAR(16777216), "TARGET_USER" ARRAY, "MODEL_USER" VARCHAR(16777216))
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+
+    var exec_role = EXEC_ROLE.toLocaleUpperCase();
+    var model_user = MODEL_USER.toLocaleUpperCase();
+    try
+    {
+        snowflake.execute({sqlText: `USE ROLE ${exec_role}`});
+    try{
+    snowflake.execute({sqlText: `USE ROLE SYSADMIN`});
+	snowflake.execute({sqlText: `SHOW GRANTS TO USER ${model_user}`});
+	var rs = snowflake.execute({sqlText: `SELECT "role" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "granted_to" = ''USER'';`});
+    snowflake.execute({sqlText: `USE ROLE ${exec_role}`});
+    while (rs.next())  {
+        var var1=rs.getColumnValue(1);
+     for (var col_num = 0; col_num < TARGET_USER.length; col_num = col_num + 1)
+                {
+                var target = TARGET_USER[col_num].toLocaleUpperCase();
+        snowflake.execute({sqlText: `GRANT ROLE ${var1} TO USER ${target};`});
+        }
+        }
+         var table_as_json = {};
+                table_as_json = { "flag" : 1,"response": ''Privileges of '' + model_user + '' is replicated to User ''+ '' '' + TARGET_USER +'' successfully!''};
+                return table_as_json;
+        }
+    
+       catch(e)
+        {
+            var table_as_json = {};
+            table_as_json = { "flag" : 0,"response": e.message};
+            return table_as_json;
+        }
+   }
+    
+        
+    catch(err)
+    {
+    var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+
+
+-----------SP_RETURN_DATABASES()----------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_DATABASES()
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+    
+    var row_as_json = {};
+    var array_of_rows = [];
+    var COL_NAMES=[''NAME'',''OWNER''];
+    try{
+    snowflake.execute({sqlText: `SHOW DATABASES`});
+	var rs = snowflake.execute({sqlText: `SELECT "name","owner" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))`});
+    var row_num = 1;
+    while (rs.next())  {
+    row_as_json = {};
+    for (var col_num = 0; col_num < COL_NAMES.length; col_num = col_num + 1) {
+        var col_name = COL_NAMES[col_num];
+        row_as_json[col_name] = rs.getColumnValue(col_num + 1);
+        }
+    array_of_rows.push(row_as_json);
+    ++row_num;
+    }
+    var table_as_json = {};
+    table_as_json = { "flag" : 1,"response" : array_of_rows};
+    return table_as_json;
+     }
+    catch(err)
+    {
+      var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+
+-----------SP_RETURN_INTEGRATIONS---------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_INTEGRATIONS()
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+  
+   var row_as_json = {};
+   var array_of_rows = [];
+   var COL_NAMES=[''NAME'',''TYPE''];
+   try{
+   snowflake.execute({sqlText: `SHOW INTEGRATIONS`});
+    var rs = snowflake.execute({sqlText: `SELECT "name","type" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))`});
+   var row_num = 1;
+   while (rs.next())  {
+   row_as_json = {};
+   for (var col_num = 0; col_num < COL_NAMES.length; col_num = col_num + 1) {
+       var col_name = COL_NAMES[col_num];
+       row_as_json[col_name] = rs.getColumnValue(col_num + 1);
+       }
+   array_of_rows.push(row_as_json);
+   ++row_num;
+   }
+   var table_as_json = {};
+   table_as_json = { "flag" : 1,"response" : array_of_rows};
+   return table_as_json;
+    }
+   catch(err)
+   {
+     var table_as_json = {};
+       table_as_json = { "flag" : 0,"response": err.message};
+       return table_as_json;
+   }
+';
+
+
+---------------SP_RETURN_OBJECT_LIST--------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_OBJECT_LIST("DB_NAME" VARCHAR(16777216), "SCHEMA_NAME" VARCHAR(16777216), "OBJECT_TYPE" VARCHAR(16777216))
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+   var inp_db_name = DB_NAME.toLocaleUpperCase();
+   var inp_schema_name = SCHEMA_NAME.toLocaleUpperCase();
+   var inp_object_type = OBJECT_TYPE.toLocaleUpperCase();
+   var row_as_json = {};
+   var array_of_rows = [];
+   try{
+   if (inp_object_type=="STAGES")
+   {
+   snowflake.execute({sqlText: `SHOW ${inp_object_type} in schema ${inp_db_name}.${inp_schema_name}`});
+   var rs = snowflake.execute({sqlText: `SELECT "name","type" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))`});
+   var row_num = 1;
+   while (rs.next())  {
+   row_as_json = {};
+   row_as_json[''name''] = rs.getColumnValue(1);
+   row_as_json[''type''] = rs.getColumnValue(2);  
+   array_of_rows.push(row_as_json);
+   ++row_num;
+   }
+   }
+    else{
+    snowflake.execute({sqlText: `SHOW ${inp_object_type} in schema ${inp_db_name}.${inp_schema_name}`});
+   var rs = snowflake.execute({sqlText: `SELECT "name" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))`});
+   var row_num = 1;
+   while (rs.next())  {
+   row_as_json = {};
+       row_as_json[''name''] = rs.getColumnValue(1); 
+   array_of_rows.push(row_as_json);
+   ++row_num;
+   }
+   }
+   var table_as_json = {};
+   table_as_json = { "flag" : 1,"response" : array_of_rows};
+   return table_as_json;
+    }
+   catch(err)
+   {
+     var table_as_json = {};
+       table_as_json = { "flag" : 0,"response": err.message};
+       return table_as_json;
+   }
+';
+
+
+
+
+--------------SP_RETURN_RESOURCE_MONITORS---------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_RESOURCE_MONITORS()
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+  
+   var row_as_json = {};
+   var array_of_rows = [];
+   var COL_NAMES=[''NAME'',''CREDIT_QUOTA''];
+   try{
+   snowflake.execute({sqlText: `SHOW RESOURCE MONITORS`});
+    var rs = snowflake.execute({sqlText: `SELECT "name","credit_quota" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))`});
+   var row_num = 1;
+   while (rs.next())  {
+   row_as_json = {};
+   for (var col_num = 0; col_num < COL_NAMES.length; col_num = col_num + 1) {
+       var col_name = COL_NAMES[col_num];
+       row_as_json[col_name] = rs.getColumnValue(col_num + 1);
+       }
+   array_of_rows.push(row_as_json);
+   ++row_num;
+   }
+   var table_as_json = {};
+   table_as_json = { "flag" : 1,"response" : array_of_rows};
+   return table_as_json;
+    }
+   catch(err)
+   {
+     var table_as_json = {};
+       table_as_json = { "flag" : 0,"response": err.message};
+       return table_as_json;
+   }
+';
+
+
+
+-------------SP_RETURN_ROLES()------------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_ROLES()
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+    var row_as_json = {};
+    var array_of_rows = [];
+    var COL_NAMES=[''NAME'',''OWNER''];
+    try{
+	snowflake.execute({sqlText: `SHOW ROLES`});
+    var rs = snowflake.execute({sqlText: `SELECT "name", "owner" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))`});
+    var row_num = 1;
+    while (rs.next())  {
+    row_as_json = {};
+    for (var col_num = 0; col_num < COL_NAMES.length; col_num = col_num + 1) {
+        var col_name = COL_NAMES[col_num];
+        row_as_json[col_name] = rs.getColumnValue(col_num + 1);
+        }
+    array_of_rows.push(row_as_json);
+    ++row_num;
+    }
+    var table_as_json = {};
+            table_as_json = { "flag" : 1,"response": array_of_rows};
+            return table_as_json;
+     }
+    catch(err)
+    {
+        var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+
+
+---------------------SP_RETURN_SCHEMAS-----------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_SCHEMAS("DB_NAME" VARCHAR(16777216))
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+   var inp_database = DB_NAME.toLocaleUpperCase();
+   var row_as_json = {};
+   var array_of_rows = [];
+   var COL_NAMES=[''NAME'',''OWNER''];
+   try{
+   snowflake.execute({sqlText: `SHOW schemas IN DATABASE ${inp_database};`});
+    var rs =snowflake.execute({sqlText: `SELECT "name","owner" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));`});
+   var row_num = 1;
+   while (rs.next())  {
+   row_as_json = {};
+   for (var col_num = 0; col_num < COL_NAMES.length; col_num = col_num + 1) {
+       var col_name = COL_NAMES[col_num];
+       row_as_json[col_name] = rs.getColumnValue(col_num + 1);
+       }
+   array_of_rows.push(row_as_json);
+   ++row_num;
+   }
+   var table_as_json = {};
+   table_as_json = { "flag" : 1,"response" : array_of_rows};
+   return table_as_json;
+    }
+   catch(err)
+   {
+     var table_as_json = {};
+       table_as_json = { "flag" : 0,"response": err.message};
+       return table_as_json;
+   }
+';
+
+
+-----------SP_RETURN_TAG_VALUES--------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_TAG_VALUES()
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+   var rownum=0;
+   
+    var array_of_rows = [];
+   try
+   {
+    snowflake.execute({sqlText: `SHOW TAGS;`});
+    var tags=snowflake.execute({sqlText: `SELECT "name","allowed_values" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));`});
+    while(tags.next())
+    {
+    var row_as_json = {};
+    row_as_json[''tag'']=tags.getColumnValue(1);
+    row_as_json[''tagValues'']=tags.getColumnValue(2);
+    array_of_rows.push(row_as_json);
+    ++rownum;
+    }
+    
+    var table_as_json = {};
+            table_as_json = { "flag" : 1,"response":array_of_rows};
+            return table_as_json;
+     }
+    catch(err)
+    {
+        var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+
+
+--------SP_RETURN_USERS()------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_USERS()
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+    
+    var row_as_json = {};
+    var array_of_rows = [];
+    
+    var COL_NAMES=[''NAME'',''LOGIN_NAME''];
+   // snowflake.execute({sqlText: `USE ROLE SECURITYADMIN`});
+   try
+   {
+    snowflake.execute({sqlText: `SHOW USERS`});
+	var rs = snowflake.execute({sqlText: `SELECT "name","login_name" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))`});
+    // Read each row and add it to the array we will return.
+    var row_num = 1;
+    while (rs.next())  {
+    // Put each row in a variable of type JSON.
+    row_as_json = {};
+    // For each column in the row...
+    for (var col_num = 0; col_num < COL_NAMES.length; col_num = col_num + 1) {
+        var col_name = COL_NAMES[col_num];
+        row_as_json[col_name] = rs.getColumnValue(col_num + 1);
+        }
+    // Add the row to the array of rows.
+    array_of_rows.push(row_as_json);
+    ++row_num;
+    }
+    // Put the array in a JSON variable (so it looks like a VARIANT to Snowflake).  The key is "key1", and the value is the array that has the rows we want.
+    var table_as_json = {};
+            table_as_json = { "flag" : 1,"response":array_of_rows};
+            return table_as_json;
+     }
+    catch(err)
+    {
+        var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+
+    }
+';
+
+
+------------------SP_RETURN_USERS_OF_ROLE(VARCHAR)------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_USERS_OF_ROLE("ROLE_NAME" VARCHAR(16777216))
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+
+    var inp_role_name = ROLE_NAME.toLocaleUpperCase();
+    
+    var array_of_rows = [];
+    
+    try{
+    var usr=snowflake.execute({sqlText: `SHOW USERS`});
+    while (usr.next())  {
+    var usr1=usr.getColumnValue(1)
+	snowflake.execute({sqlText: `SHOW GRANTS TO USER ${usr1}`});
+	var rs = snowflake.execute({sqlText: `SELECT "grantee_name" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "granted_to" = ''USER'' and "role"=''${inp_role_name}'';`});
+    while (rs.next())  {
+        array_of_rows.push(rs.getColumnValue(1));
+        }
+        }
+   
+    
+    var table_as_json = {};
+            table_as_json = { "flag" : 1,"response":array_of_rows};
+            return table_as_json;
+    }
+       catch(e)
+        {
+            var table_as_json = {};
+            table_as_json = { "flag" : 0,"response": e.message};
+            return table_as_json;
+        }
+   
+';
+
+
+
+-------------SP_RETURN_WAREHOUSES-----------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_RETURN_WAREHOUSES()
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+EXECUTE AS CALLER
+AS '
+    
+    var row_as_json = {};
+    var array_of_rows = [];
+    var COL_NAMES=[''NAME'',''STATE'',''SIZE''];
+    try{
+    snowflake.execute({sqlText: `SHOW WAREHOUSES`});
+	var rs = snowflake.execute({sqlText: `SELECT "name","state","size" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))`});
+    var row_num = 1;
+    while (rs.next())  {
+    row_as_json = {};
+    for (var col_num = 0; col_num < COL_NAMES.length; col_num = col_num + 1) {
+        var col_name = COL_NAMES[col_num];
+        row_as_json[col_name] = rs.getColumnValue(col_num + 1);
+        }
+    array_of_rows.push(row_as_json);
+    ++row_num;
+    }
+            var table_as_json = {};
+            table_as_json = { "flag" : 1,"response":array_of_rows};
+            return table_as_json;
+      }
+    catch(err)
+    {
+      var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+      }
+
+';
+
+
+-----------------SP_REVOKE_PRIVS_FROM_ROLE--------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_REVOKE_PRIVS_FROM_ROLE("EXEC_ROLE" VARCHAR(16777216), "PRIVILEGES_LIST" VARCHAR(16777216), "ON_OBJECT_LEVEL" VARCHAR(16777216), "ON_OBJECT_NAME" ARRAY, "IN_OBJECT_LEVEL" VARCHAR(16777216), "IN_OBJECT_NAME" VARCHAR(16777216), "TARGET_ROLE_NAME" ARRAY)
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+COMMENT='Stored Procedure to grant ROLE to a ROLE or a USER to build the RBAC hierarchy.'
+EXECUTE AS CALLER
+AS '
+    var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+    var inp_privileges = PRIVILEGES_LIST.toLocaleUpperCase();
+ 
+    if (!ON_OBJECT_LEVEL) {var inp_on_object_level = '''' }
+        else {var inp_on_object_level = ON_OBJECT_LEVEL.toLocaleUpperCase();}
+  
+    if (!IN_OBJECT_LEVEL) {var inp_in_object_level = '''' }
+        else {var inp_in_object_level = IN_OBJECT_LEVEL.toLocaleUpperCase();}
+ 
+    if (!IN_OBJECT_NAME) {var inp_in_object_name = '''' }
+        else {var inp_in_object_name = IN_OBJECT_NAME.toLocaleUpperCase();}
+ 
+    try
+    {
+        snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+        try
+        {   
+            for (var col_num1 = 0; col_num1 < TARGET_ROLE_NAME.length; col_num1 = col_num1 + 1)
+			{
+            var inp_target_role_name = TARGET_ROLE_NAME[col_num1].toLocaleUpperCase();
+            if (!inp_in_object_level || !inp_in_object_name)
+            {
+                for (var col_num = 0; col_num < ON_OBJECT_NAME.length; col_num = col_num + 1)
+				{
+					if (!ON_OBJECT_NAME[col_num]) {var inp_on_object_name = '''' }
+					else {var inp_on_object_name = ON_OBJECT_NAME[col_num].toLocaleUpperCase();}
+                var resp=snowflake.execute({sqlText: `REVOKE ${inp_privileges} ON ${inp_on_object_level} ${inp_on_object_name} FROM ROLE ${inp_target_role_name}`});
+                
+                while (resp.next())
+                {
+                if(resp.getColumnValue(1)=="Revoke not executed: Insufficient privileges.")
+                {
+                  throw new Error("Role doesn''t have enough privileges to revoke privileges");
+                }
+                else
+				{
+				continue;
+				}
+				}
+				continue;
+			}
+                
+          }
+          else
+            {
+                for (var col_num = 0; col_num < ON_OBJECT_NAME.length; col_num = col_num + 1)
+				{
+					if (!ON_OBJECT_NAME[col_num]) {var inp_on_object_name = '''' }
+					else {var inp_on_object_name = ON_OBJECT_NAME[col_num].toLocaleUpperCase();}
+                var resp=snowflake.execute({sqlText: `REVOKE ${inp_privileges} ON ${inp_on_object_level} ${inp_on_object_name} IN ${inp_in_object_level} ${inp_in_object_name} FROM ROLE ${inp_target_role_name}`});
+                while (resp.next())
+                {
+                if(resp.getColumnValue(1)=="Revoke not executed: Insufficient privileges.")
+                {
+                  throw new Error("Role doesn''t have enough privileges to revoke privileges");
+                }
+                else
+                {
+                continue;
+                }
+                }
+                continue;
+            }
+        }
+        }
+        var table_as_json = {};
+                table_as_json = { "flag" : 1,"response": ''Privileges are revoked from the ROLE '' + TARGET_ROLE_NAME + '' successfully!''};
+                return table_as_json;
+        }
+        catch(e)
+        {
+            var table_as_json = {};
+            table_as_json = { "flag" : 0,"response": e.message};
+            return table_as_json;
+        }
+    }
+    catch(err)
+    {
+       var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+    }
+';
+
+
+-------------SP_REVOKE_ROLE-----------------
+
+CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_REVOKE_ROLE("EXEC_ROLE" VARCHAR(16777216), "ROLE_NAME" ARRAY, "TARGET_TYPE" VARCHAR(16777216), "TARGET_NAME" ARRAY)
+RETURNS VARIANT
+LANGUAGE JAVASCRIPT
+STRICT
+COMMENT='Stored Procedure to revoke ROLE from a ROLE or a USER.'
+EXECUTE AS CALLER
+AS '
+var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
+    var inp_target_type = TARGET_TYPE.toLocaleUpperCase();
+    try
+    {
+    if (inp_target_type  == ''USER'' || inp_target_type  == ''ROLE'')
+    {       
+            snowflake.execute({sqlText: `USE ROLE ${inp_exec_role}`});
+            try
+            {
+                for (var col_num = 0; col_num < ROLE_NAME.length; col_num = col_num + 1)
+                {
+                var inp_role_name = ROLE_NAME[col_num].toLocaleUpperCase();
+                for (var col_num1 = 0; col_num1 < TARGET_NAME.length; col_num1 = col_num1 + 1)
+                {
+                var inp_target_name = TARGET_NAME[col_num1].toLocaleUpperCase();
+                var resp=snowflake.execute({sqlText: `REVOKE ROLE ${inp_role_name} FROM ${inp_target_type} ${inp_target_name}`});
+                 while (resp.next())
+                {
+                if(resp.getColumnValue(1)=="Revoke not executed: Insufficient privileges.")
+                {
+                  throw new Error("Role doesn''t have enough privileges to revoke role");
+                }
+                }
+                }
+                }
+            var table_as_json = {};
+            table_as_json = { "flag" : 1,"response": ''ROLE '' + ROLE_NAME + '' is revoked from ''+ inp_target_type + '' '' + TARGET_NAME +'' successfully!''};
+            return table_as_json;
+            }
+            catch(e)
+            {
+               var table_as_json = {};
+               table_as_json = { "flag" : 0,"response": e.message};
+               return table_as_json;
+            }
+        }
+        else
+        {
+        throw new Error("Please enter a valid TARGET_TYPE (USER/ROLE)");
+        }
+        }    
+        catch(err)
+        {
+        var table_as_json = {};
+        table_as_json = { "flag" : 0,"response": err.message};
+        return table_as_json;
+        }   
 ';
