@@ -1,1 +1,1 @@
-Select * from Quick_Sd;
+
