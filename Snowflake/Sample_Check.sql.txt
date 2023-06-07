@@ -6,7 +6,7 @@ CREATE OR REPLACE PROCEDURE ACCELERATOR_DB.RBAC.SP_CREATE_ROLE("EXEC_ROLE" VARCH
 RETURNS VARIANT
 LANGUAGE JAVASCRIPT
 STRICT
-COMMENT='Stored Procedure to create ROLE.'
+COMMENT='Stored Procedure to create ROLES for Kipistone project'
 EXECUTE AS CALLER
 AS '
    var inp_exec_role = EXEC_ROLE.toLocaleUpperCase();
